@@ -1,0 +1,25 @@
+1
+00:00:01,000 --> 00:00:05,000
+Dinosaurs roamed the Earth
+millions of years ago.
+
+2
+00:00:06,000 --> 00:00:09,000
+They were incredible creatures,
+from tiny to enormous!
+
+3
+00:00:10,000 --> 00:00:14,000
+Tyrannosaurus rex was
+one of the largest carnivores.
+
+4
+00:00:15,000 --> 00:00:19,000
+While the gentle Brachiosaurus
+fed on plants high in the trees.
+
+5
+00:00:20,000 --> 00:00:24,000
+Sadly, dinosaurs became extinct
+around 65 million years ago.
+

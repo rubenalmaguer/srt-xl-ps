@@ -1,0 +1,7 @@
+Drag Excel or srt files to Convert-SRT-Excel_1.0.cmd.
+
+For Excel:
+  * START TIME, END TIME, and TEXT must be in columns A, B and C, respectively.
+  * The first row (headers) is ignored.
+  * If END TIME is missing, 2 seconds are used as default.
+
