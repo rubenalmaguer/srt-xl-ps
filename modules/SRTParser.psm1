@@ -98,7 +98,7 @@ function Out-FileSafe {
     }
 
     # Write the file
-    $Content | Out-File -FilePath $FilePath -Encoding $Encoding
+    $Content | Out-File -LiteralPath $FilePath -Encoding $Encoding
 }
 
 function Convert-SrtToCues {

@@ -12,8 +12,10 @@ foreach ($module in $modules) {
 
 # ==============================
 ## MODIFY SRT
+Write-Host
+Write-Host "MODIFY SRT" -BackgroundColor DarkCyan -ForegroundColor White
 
-$srtPath = [System.IO.Path]::GetFullPath("./samples/subtitles2.srt");
+$srtPath = [System.IO.Path]::GetFullPath("./samples/sample-from-srt.srt");
 
 try {
     if (-not $(Test-Path -LiteralPath $srtPath)) {
@@ -39,18 +41,30 @@ if ($srtContent) {
         text    = "THIS IS EXTRA!!!!"
     }
     
-    Convert-CuesToSrt -Cues $cues -OutputPath $([System.IO.Path]::GetFullPath("./samples/out/modified-subtitles.srt")) | Out-Null
+    Convert-CuesToSrt -Cues $cues -OutputPath $([System.IO.Path]::GetFullPath("./samples/[out]/modified-subtitles.srt")) | Out-Null
 }
 
 
 # ==============================
 ## EXCEL TO SRT
-$cues = Convert-ExcelToCues -ExcelPath $([System.IO.Path]::GetFullPath("./samples/subtitles.xlsx"))
-Convert-CuesToSrt -Cues $cues -OutputPath $([System.IO.Path]::GetFullPath("./samples/out/output-from-xl.srt")) | Out-Null
+Write-Host
+Write-Host "EXCEL TO SRT" -BackgroundColor DarkCyan -ForegroundColor White
+
+$error, $cues = Convert-ExcelToCues -ExcelPath $([System.IO.Path]::GetFullPath("./samples/sample-from-xl.xlsx"))
+
+if ($null -ne $error) {
+    write-host $error
+}
+else {
+    Convert-CuesToSrt -Cues $cues -OutputPath $([System.IO.Path]::GetFullPath("./samples/[out]/sample-from-xl.xlsx.srt")) | Out-Null
+}
 
 
 # ==============================
 ## CUES TO EXCEL
+Write-Host
+Write-Host "CUES TO SRT" -BackgroundColor DarkCyan -ForegroundColor White
+
 $cues = @(
     @{ startMS = 1000; endMS = 5000; text = "Hello, world!" },
     @{ startMS = 6000; endMS = 10000; text = "This is a test." }
