@@ -9,6 +9,21 @@ foreach ($module in $modules) {
     Import-Module "./modules/$($module).psm1"
 }
 
+# ==============================
+## FRAMES XL to SRT
+Write-Host
+Write-Host "FRAMES to SRT" -BackgroundColor DarkCyan -ForegroundColor White
+
+$error, $cues = Convert-ExcelToCues -ExcelPath $([System.IO.Path]::GetFullPath("./samples/sample-with-frames.xlsx"))
+
+if ($null -ne $error) {
+    write-host $error
+}
+else {
+    Convert-CuesToSrt -Cues $cues -OutputPath $([System.IO.Path]::GetFullPath("./samples/[out]/sample-with-frames.xlsx.srt")) | Out-Null
+}
+
+Exit
 
 # ==============================
 ## MODIFY SRT

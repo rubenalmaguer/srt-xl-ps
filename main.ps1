@@ -86,7 +86,7 @@ function main() {
     }
 
     # ConfirmExit # CMS stays open
-    Write-Host "`nDone".
+    Read-Host "`nDone".
     Exit
 }
 

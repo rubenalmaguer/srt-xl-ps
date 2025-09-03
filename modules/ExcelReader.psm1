@@ -1,5 +1,10 @@
 # ExcelReader.psm1
 
+# Big assumption! Don't mix these two up: 29.976 vs. 23.96
+# Used when reading frame-based timestamps (00;00;00;00 or 00:00:00;00)
+# IRRELEVANT for milliseconds-based timestamps (00:00:00,000)
+$FRAME_RATE = 29.976
+
 function Convert-ExcelToCues {
     param (
         [Parameter(Mandatory = $true)]
@@ -108,8 +113,8 @@ function Convert-ExcelTimeToMilliseconds {
         return ConvertTo-Milliseconds -TimeStamp $TimeValue
     }
 
-    # Handle various Excel time formats
-    if ($TimeValue -match '^(\d{1,2}):(\d{2}):(\d{2})\.(\d{1,3})$') {
+    # Handle various Excel time formats (e.g. 00:00:00,00 <- Seen this as a form of cropped milliseconds)
+    if ($TimeValue -match '^(\d{1,2}):(\d{2}):(\d{2})[\.,](\d{1,3})$') {
         # Format: HH:MM:SS.mmm
         $hours = $matches[1]
         $minutes = $matches[2]
@@ -126,8 +131,46 @@ function Convert-ExcelTimeToMilliseconds {
     elseif ($TimeValue -match '^\d+\.?\d*$') {
         # Excel serial time format (fraction of 24 hours)
         $serialTime = [double]$TimeValue
+
+        # Excel serial dates are typically between 1 and 50000+ (year 2136)
+        # For time-only values, should be between 0 and 1
+        if ($serialTime -gt 1000) {
+            Write-Warning "Value $TimeValue seems too large for Excel serial time format, skipping this format"
+            return [int]0  # TODO: Handle appropriately
+        }
+
         $totalMilliseconds = $serialTime * 24 * 60 * 60 * 1000
-        return [int]$totalMilliseconds
+
+        # Convert to long first to avoid overflow, then check if it fits in int
+        $totalMs = [long]$totalMilliseconds
+    
+        if ($totalMs -gt [int]::MaxValue -or $totalMs -lt [int]::MinValue) {
+            Write-Host "Result too large for Int32, returning as Long: $totalMs"
+            return $totalMs  # Return as long
+        }
+        return [int]$totalMs
+    }
+    elseif ($TimeValue -match '^(\d{1,2})[:;](\d{2})[:;](\d{2})[:;](\d{2})$') {
+        
+        # Frames-based Format
+
+        $hours = $matches[1]
+        $minutes = $matches[2]
+        $seconds = $matches[3]
+        $frames = $matches[4] #.PadLeft(2, '0')
+
+        <#         Write-Host "-------------------------------------------"
+        Write-Host "Value: $TimeValue"
+        Write-Host "Frames: $frames" #>
+
+        $milliseconds = [int]([int]$frames * (1000 / $FRAME_RATE))
+
+        <# Write-Host "Milliseconds: $milliseconds" #>
+
+        # If you need it in reverse: $frames = [int]$milliseconds * ($FRAME_RATE / 1000)
+
+        return ([int]$hours * 3600000) + ([int]$minutes * 60000) + ([int]$seconds * 1000) + [int]$milliseconds
+
     }
     else {
         throw "Unsupported time format: $TimeValue"
@@ -143,6 +186,7 @@ function Convert-CuesToExcel {
         [Parameter(Mandatory = $true)]
         [string]$ExcelPath, # Desired path of the output Excel file
 
+        [Parameter(Mandatory = $false)]
         [string]$SheetName = "Subtitles"  # Optional: default sheet name
     )
     try {
@@ -166,9 +210,9 @@ function Convert-CuesToExcel {
 
         foreach ($cue in $Cues) {
             # Convert start and end times from milliseconds to timestamp string
-            $startTime = Convert-MillisecondsToTimestamp -Milliseconds $cue.startMS
+            $startTime = Convert-MillisecondsToTimestamp -Milliseconds $cue.startMS -FrameRate $FRAME_RATE
 
-            $endTime = Convert-MillisecondsToTimestamp -Milliseconds $cue.endMS
+            $endTime = Convert-MillisecondsToTimestamp -Milliseconds $cue.endMS -FrameRate $FRAME_RATE
 
             # Write data to Excel
             $worksheet.Cells($row, 1).Value = $startTime
@@ -218,7 +262,10 @@ function Convert-CuesToExcel {
 function Convert-MillisecondsToTimestamp {
     param(
         [Parameter(Mandatory = $true)]
-        [int]$Milliseconds
+        [int]$Milliseconds,
+
+        [Parameter(Mandatory = $false)]
+        [int]$FrameRate = 0 # If provided, use 00;00;00;00 format (with frames) instead of 00:00:00,000 (with milliseconds)
     )
 
     $MS_PER_HR = 3600000
@@ -239,7 +286,15 @@ function Convert-MillisecondsToTimestamp {
     $formattedSeconds = $seconds.ToString("00")
     $formattedMS = $ms.ToString("000")
 
-    return "$formattedHours`:$formattedMinutes`:$formattedSeconds,$formattedMS"
+    $formattedTimestamp = "$formattedHours`:$formattedMinutes`:$formattedSeconds,$formattedMS"
+
+    if ($FrameRate -gt 0) {
+        $frames = [math]::Round($ms * ($FrameRate / 1000))
+        $formattedFRAMES = $frames.ToString("00")
+        $formattedTimestamp = "$formattedHours`;$formattedMinutes`;$formattedSeconds`;$formattedFRAMES"
+    }
+
+    return $formattedTimestamp
 }
 
 function Save-ExcelSafe {
