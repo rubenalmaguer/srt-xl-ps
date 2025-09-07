@@ -187,13 +187,22 @@ function Convert-CuesToExcel {
         [string]$ExcelPath, # Desired path of the output Excel file
 
         [Parameter(Mandatory = $false)]
-        [string]$SheetName = "Subtitles"  # Optional: default sheet name
+        [string]$SheetName = "Subtitles",  # Optional: default sheet name
+
+        [Parameter(Mandatory = $false)]
+        [double]$FrameRate = $FRAME_RATE  # Add frame rate parameter with default value
     )
+    
+    # Initialize variables for cleanup
+    $excel = $null
+    $workbook = $null
+    $worksheet = $null
+    
     try {
         # Create Excel COM object
         $excel = New-Object -ComObject Excel.Application
-        $excel.Visible = $false
-        $excel.DisplayAlerts = $false
+        $excel.Visible = $true
+        $excel.DisplayAlerts = $false  # Changed to false to prevent popup dialogs
 
         # Create a new workbook
         $workbook = $excel.Workbooks.Add()
@@ -205,29 +214,36 @@ function Convert-CuesToExcel {
         $worksheet.Cells(1, 2).Value = "End Time"
         $worksheet.Cells(1, 3).Value = "Text"
 
-        # Start writing from row 2
-        $row = 2
-
-        foreach ($cue in $Cues) {
+        # Prepare data array for bulk write (much faster than individual cell writes)
+        $rowCount = $Cues.Count
+        $colCount = 3
+        $dataArray = New-Object 'object[,]' $rowCount, $colCount
+        
+        for ($i = 0; $i -lt $rowCount; $i++) {
+            $cue = $Cues[$i]
             # Convert start and end times from milliseconds to timestamp string
-            $startTime = Convert-MillisecondsToTimestamp -Milliseconds $cue.startMS -FrameRate $FRAME_RATE
+            $startTime = Convert-MillisecondsToTimestamp -Milliseconds $cue.startMS -FrameRate $FrameRate
+            $endTime = Convert-MillisecondsToTimestamp -Milliseconds $cue.endMS -FrameRate $FrameRate
+            
+            # Store in 2D array
+            $dataArray[$i, 0] = $startTime
+            $dataArray[$i, 1] = $endTime
+            $dataArray[$i, 2] = $cue.text
+        }
 
-            $endTime = Convert-MillisecondsToTimestamp -Milliseconds $cue.endMS -FrameRate $FRAME_RATE
-
-            # Write data to Excel
-            $worksheet.Cells($row, 1).Value = $startTime
-            $worksheet.Cells($row, 2).Value = $endTime
-            $worksheet.Cells($row, 3).Value = $cue.text
-            $row++
+        # Write all data at once using Range (bulk operation - much faster)
+        if ($rowCount -gt 0) {
+            $startRange = $worksheet.Cells(2, 1)  # Start at A2
+            $endRange = $worksheet.Cells(1 + $rowCount, 3)  # End at C(1+count)
+            $range = $worksheet.Range($startRange, $endRange)
+            $range.Value = $dataArray
         }
 
         # Auto-fit columns
         $worksheet.Columns.AutoFit()
 
-        
         # Wider Text column (C [3])
-        $column3 = $worksheet.Columns.Item(3)
-        $column3.ColumnWidth = $column3.ColumnWidth * 5
+        $worksheet.Columns(3).ColumnWidth = 50
 
         # Save
         $savedPath = Save-ExcelSafe -Workbook $workbook -Path $ExcelPath
@@ -244,18 +260,37 @@ function Convert-CuesToExcel {
         throw
     }
     finally {
-        # Clean up Excel objects
-        <#         if (-not $null -eq $workbook) {
-            $workbook.Close($false)
-        } #>
-        if ($excel) {
-            $excel.Quit()
-            [System.Runtime.Interopservices.Marshal]::ReleaseComObject($worksheet) | Out-Null
-            if ($workbook) { [System.Runtime.Interopservices.Marshal]::ReleaseComObject($workbook) | Out-Null }
-            [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
+        # Clean up Excel objects - always attempt to close everything  
+        try {
+            if ($worksheet) {
+                try { [System.Runtime.Interopservices.Marshal]::ReleaseComObject($worksheet) | Out-Null } catch { }
+            }
+        }
+        catch { }
+
+        try {
+            if ($workbook) {
+                try { $workbook.Close($false) } catch { Write-Warning "Could not close workbook: $_" }
+                try { [System.Runtime.Interopservices.Marshal]::ReleaseComObject($workbook) | Out-Null } catch { }
+            }
+        }
+        catch { }
+        
+        try {
+            if ($excel) {
+                try { $excel.Quit() } catch { Write-Warning "Could not quit Excel: $_" }
+                try { [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null } catch { }
+            }
+        }
+        catch { }
+        
+        # Force garbage collection
+        try {
             [System.GC]::Collect()
             [System.GC]::WaitForPendingFinalizers()
+            [System.GC]::Collect()
         }
+        catch { }
     }
 }
 

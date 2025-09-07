@@ -150,8 +150,8 @@ function Convert-CuesToExcel {
     try {
         # Create Excel COM object
         $excel = New-Object -ComObject Excel.Application
-        $excel.Visible = $false
-        $excel.DisplayAlerts = $false
+        $excel.Visible = $true
+        $excel.DisplayAlerts = $true
         # Create a new workbook
         $workbook = $excel.Workbooks.Add()
         $worksheet = $workbook.Worksheets.Item(1)
